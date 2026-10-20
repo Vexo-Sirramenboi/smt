@@ -3,6 +3,9 @@ name: Mirror Website
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
   schedule:
     - cron: "30 5 * * 1"
 
@@ -16,8 +19,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -25,11 +29,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install crawler dependencies
-        run: pip install requests beautifulsoup4
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
 
-      - name: Download website
+      - name: Mirror website
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: python scripts/mirror.py
+
+      - name: Verify website entry point
+        run: |
+          test -s mirror/index.html
+          echo "Website entry point exists."
+          find mirror -type f | head -100
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
