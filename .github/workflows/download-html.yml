@@ -1,41 +1,53 @@
 
-name: Download Google Apps Script HTML
+name: Collect Website Dependencies
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: write
 
 jobs:
-  download-html:
+  collect:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download HTML
-        run: |
-          curl -fLsS \
-            "https://script.google.com/macros/s/AKfycbxyhy_leO9Ld19yVy9O0-cs-d7Z-mbeJZXdqgzAySaPb98tNF9FaV_mfMH0qJucHhgZ/exec" \
-            -o index.html
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Check downloaded file
+      - name: Install dependencies
         run: |
-          test -s index.html
-          head -c 200 index.html
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
 
-      - name: Commit changes
+      - name: Download website HTML
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          if ! git diff --cached --quiet; then
-            git commit -m "Update downloaded HTML"
-            git push
-          else
-            echo "No changes to commit"
-          fi
+          mkdir -p site
+          python - <<'PY'
+          import requests
+
+          url = "https://storage.googleapis.com/yubico/study.html"
+          response = requests.get(url, timeout=30)
+          response.raise_for_status()
+
+          with open("site/study.html", "wb") as f:
+              f.write(response.content)
+
+          print("Downloaded HTML:", len(response.content), "bytes")
+          PY
+
+      - name: Upload collected files
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-files
+          path: site/
+          if-no-files-found: error
