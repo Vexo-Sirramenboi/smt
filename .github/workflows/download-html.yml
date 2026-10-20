@@ -1,11 +1,10 @@
 
-name: Mirror Website
+name: Crawl and Mirror Website
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
   schedule:
     - cron: "30 5 * * 1"
 
@@ -19,9 +18,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -34,16 +32,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4
 
-      - name: Mirror website
+      - name: Crawl website
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python scripts/mirror.py
 
-      - name: Verify website entry point
-        run: |
-          test -s mirror/index.html
-          echo "Website entry point exists."
-          find mirror -type f | head -100
+      - name: Upload crawl reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: crawl-reports
+          path: |
+            mirror/crawl-report.json
+            mirror/urls.txt
+          if-no-files-found: warn
+
+      - name: Verify output
+        run: test -s mirror/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
@@ -53,16 +57,13 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-
     permissions:
       pages: write
       id-token: write
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
